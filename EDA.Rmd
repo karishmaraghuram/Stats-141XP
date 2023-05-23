@@ -1,0 +1,44 @@
+---
+title: "EDA"
+author: "Christopher Thornton"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=F,warning=F)
+```
+
+```{r}
+library(dplyr)
+data <- readr::read_tsv("Jan to Mar15 2023.csv") %>% select(!c(Selected,RecordNo,`Recording Date`,`Scorer`, # Essentially Useless
+          `Record Type`,`SleepStudy:EKG Analysis`,`Sleep:Generic11:`,`Sleep:Generic20:`)) # Theoretically useful but not with this sample size
+```
+
+```{r}
+data <- data %>% select(AHI,`Apnea Counts`,`LEG1 Index`,`LEG2 Index`) %>% mutate(`AHI Severity`=case_when(AHI<5~"None/Minimal [0, 5)",AHI>=5&AHI<15~"Mild [5, 15)",AHI>=15&AHI<30~"Moderate [15, 30)",AHI>=30~"Severe [30, inf)"),`LEG1 Movement`=case_when(`LEG1 Index`>3~T,`LEG1 Index`<=3~F),`LEG2 Movement`=case_when(`LEG2 Index`>3~T,`LEG2 Index`<=3~F),`Both Leg Movement`=case_when(`LEG1 Movement`&`LEG2 Movement`~T,!(`LEG1 Movement`&`LEG2 Movement`)~F))
+```
+
+```{r}
+barplot(sort(table(data$`AHI Severity`),decreasing = T),main="AHI Severity",xlab="AHI Categorization",ylab="Frequency")
+sort(table(data$`AHI Severity`),decreasing = T)
+```
+
+```{r}
+hist(data$`LEG1 Index`,breaks=50,main="LEG1 Index",xlab="LEG1 Index")
+hist(data$`LEG2 Index`,breaks=50,main="LEG2 Index",xlab="LEG2 Index")
+```
+```{r}
+barplot(sort(table(data$`LEG1 Movement`),decreasing = T),main="LEG1",xlab="Index > 3",ylab="Frequency")
+barplot(sort(table(data$`LEG2 Movement`),decreasing = T),main="LEG2",xlab="Index > 3",ylab="Frequency")
+barplot(sort(table(data$`Both Leg Movement`),decreasing = T),main="Both Leg Movement",xlab="Index > 3 (both legs)",ylab="Frequency")
+```
+
+```{r}
+data <- data %>% mutate(`LEG&AHI`=case_when(AHI>=5&(`LEG1 Movement`|`LEG2 Movement`)~T,AHI<5|!(`LEG1 Movement`|`LEG2 Movement`)~F))
+barplot(sort(table(data$`LEG&AHI`),decreasing = T),main="LEG Movement and Apnea",xlab="Movement in at least one leg & AHI at least 5",ylab="Frequency")
+data <- data %>% mutate(LEG=case_when(`Both Leg Movement`==T~"Both Legs",`LEG1 Movement`==T&`LEG2 Movement`==F~"LEG1 Only",`LEG1 Movement`==F&`LEG2 Movement`==T~"LEG2 Only",`LEG1 Movement`==F&`LEG2 Movement`==F~"No Legs"),Apnea=case_when(AHI>=5~"Apnea",AHI<5~"No Apnea")) %>% tidyr::unite(`Leg&Apnea`,LEG,Apnea,sep=" & ")
+```
+```{r}
+barplot(sort(table(data$`Leg&Apnea`),decreasing = T),main="LEG Movement and Apnea",xlab="Movement in at least one leg & AHI at least 5",ylab="Frequency")
+```
