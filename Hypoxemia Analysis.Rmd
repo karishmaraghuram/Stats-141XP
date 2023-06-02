@@ -1,0 +1,58 @@
+---
+title: "Hypoxemia Analysis"
+author: "Christopher Thornton"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,message=F}
+library(dplyr)
+data <- readr::read_csv("Jan to Mar15 2023.csv")
+```
+
+```{r}
+data <- data %>% select(c(RecordNo,Age,`Gender(Male,Female)`,BMI,`Desats LT 90`,`Desats LT 80`,`Desats LT 70`,Arrhythmia)) %>% na.omit() # Just important stuff
+```
+
+```{r}
+# data <- data %>% select(!c(Selected,RecordNo,`Recording Date`,Height,HeightUnit,Weight,WeightUnit,`Record Type`,`SleepStudy:EKG Analysis`,`Sleep:Generic11:`,`Sleep:Generic20:`,Scorer)) %>% na.omit() # Everything useable
+```
+
+```{r}
+i <- sample(1:nrow(data),.8*nrow(data),replace=F)
+train <- data[i,]
+test <- data[-i,]
+```
+
+```{r}
+# glm0 <- glm(Arrhythmia~.,data=train,family = binomial)
+# summary(glm0)
+glm1 <- glm(Arrhythmia~`Desats LT 70`,data=train,family = binomial)
+summary(glm1)
+glm2 <- glm(Arrhythmia~`Desats LT 80`,data=train,family = binomial)
+summary(glm2)
+glm3 <- glm(Arrhythmia~`Desats LT 90`,data=train,family = binomial)
+summary(glm3)
+```
+
+```{r}
+pred_p <- predict(glm1,type="response",newdata = test)
+roc_data <- pROC::roc(response=test$Arrhythmia,predictor=pred_p)
+plot(roc_data)
+pROC::auc(roc_data)
+
+pred_p <- predict(glm2,type="response",newdata = test)
+roc_data <- pROC::roc(response=test$Arrhythmia,predictor=pred_p)
+plot(roc_data)
+pROC::auc(roc_data)
+
+pred_p <- predict(glm3,type="response",newdata = test)
+roc_data <- pROC::roc(response=test$Arrhythmia,predictor=pred_p)
+plot(roc_data)
+pROC::auc(roc_data)
+```
+
