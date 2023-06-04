@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r,message=F}
 library(dplyr)
-data <- readr::read_csv("Jan to Mar15 2023.csv")
+data <- readr::read_csv("Q2 Data.csv")
 ```
 
 ```{r}
@@ -23,6 +23,7 @@ data <- data %>% select(c(RecordNo,Age,`Gender(Male,Female)`,BMI,`Desats LT 90`,
 ```
 
 ```{r}
+set.seed(06042023)
 i <- sample(1:nrow(data),.8*nrow(data),replace=F)
 train <- data[i,]
 test <- data[-i,]
