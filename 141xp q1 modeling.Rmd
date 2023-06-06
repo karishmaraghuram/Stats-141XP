@@ -1,0 +1,255 @@
+---
+title: "141xp q1 modeling"
+author: "Karishma Raghuram"
+date: "2023-05-31"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#run logit model for AHI
+
+dataset <- read.csv("Jan to Mar15 2023.csv")
+head(dataset)
+
+#IF RECORD ID IS THE SAME, REMOVE DUPLICATE!!!!!!!!!
+#DONT FORGET
+dataset<-dataset[!duplicated(dataset$RecordNo),]
+```
+
+
+```{r}
+#load packages
+#library(readxl)
+#library(magrittr)
+#install.packages("pastecs")
+#library(pastecs)
+#install.packages("gridExtra")
+#library(gridExtra)
+#library(ggplot2)
+#library(dplyr)
+#install.packages("DT")
+#library(DT)
+#library(MASS)
+#install.packages("leaps")
+#library(leaps)
+#install.packages("glmnet")
+library(glmnet)
+#install.packages("PerformanceAnalytics")
+#library(PerformanceAnalytics)
+#install.packages("corrr")
+#library(corrr)
+#install.packages("tidyr")
+#library(tidyr)
+```
+
+```{r}
+#remove useless vars
+dataset<-dataset[,c(-1,-2,-4,-22,-23,-24,-25,-26,-29)]
+head(dataset)
+
+#FIX WEIGHT AND HEIGHT TO BE SAME BASIS
+#weight
+for(i in 1:nrow(dataset)){
+  if(dataset[i,"WeightUnit"]=="kg"){
+    weight_kg<-dataset[i,"Weight"]
+    weight_kg<- weight_kg*2.20462262185
+    dataset[i,"Weight"]<-weight_kg
+    dataset[i, "WeightUnit"]<-"lb"
+  }
+}
+
+#height
+for(i in 1:nrow(dataset)){
+  if(dataset[i,"HeightUnit"]=="cm"){
+    height_cm<-dataset[i,"Height"]
+    height_cm<- height_cm / 2.54
+    dataset[i,"Height"]<-height_cm
+    dataset[i, "HeightUnit"]<-"in"
+  }
+}
+
+#make gender a binary variable
+for(i in 1:nrow(dataset)){
+  if(dataset[i,"Gender.Male.Female."]=="female"){
+    #make female coded for 1
+    dataset[i,"Gender.Male.Female."]<-1
+  }
+  else{
+    #make male coded for 0
+    dataset[i,"Gender.Male.Female."]<-0
+  }
+}
+
+
+
+head(dataset)
+
+#remove NAs
+dataset<- na.omit(dataset)
+
+#split 80/20 training/testing
+set.seed(12345)
+test_i<-sample(1:nrow(dataset), (nrow(dataset)*(0.2)), replace=F)
+training<-dataset[-test_i,]
+testing<-dataset[test_i,]
+
+#assign y var 
+y<-dataset$AHI
+head(y)
+length(y)
+
+#make the AHI var into a binary outcome var
+for(i in 1:length(y)){
+  if(y[i]>30){
+    #make AHI of 30 & above coded for 1
+    #one indicates abnormal AHI
+    y[i]<-1
+  }
+  else{
+    #make AHI of below 30 coded for 0
+    #zero indicates abnormal AHI
+    y[i]<-0
+  }
+}
+
+
+head(y)
+#remove y var from predictors list
+x<-dataset[,-9]
+head(x)
+x<-data.matrix(x)
+
+#run lasso regression
+cv_model <- cv.glmnet(x=x, y=y, family = "binomial", alpha = 1)
+
+best_lambda <- cv_model$lambda.min
+best_lambda
+
+plot(cv_model)
+```
+```{r}
+best_model <-glmnet(x,y,alpha=1,lambda=best_lambda,family=binomial)
+coef(best_model)
+```
+
+
+```{r}
+#assign y var 
+y.test<-testing$AHI
+head(y.test)
+length(y.test)
+
+#remove y var from predictors list
+x.train<-testing[,-9]
+head(x.train)
+x.train<-data.matrix(x.train)
+
+new<-x.train
+y_predicted <- predict(best_model, s = best_lambda, newx = new)
+
+#find SST and SSE
+sst <- sum((y.test - mean(y.test))^2)
+sse <- sum((y_predicted - y.test)^2)
+
+#find R-Squared
+rsq <- 1 - sse/sst
+rsq
+```
+
+```{r}
+logit_data<-dataset
+for(i in 1:nrow(logit_data)){
+  if(logit_data[i,"AHI"]>30){
+    #make AHI of 30 & above coded for 1
+    #one indicates abnormal AHI
+    logit_data[i,"AHI"]<-1
+  }
+  else{
+    #zero indicates abnormal AHI
+    logit_data[i,"AHI"]<-0
+  }
+}
+
+mod.logit <- glm(AHI~AHI.REM+Apnea.Counts+Latency.to.REM+Desats.LT.90+Desats.LT.70, data = logit_data, family = "binomial")
+print(summary(mod.logit))
+
+```
+
+```{r}
+#run glm model 
+head(training)
+head(testing)
+
+
+#make the AHI var into a binary outcome var
+for(i in 1:nrow(training)){
+  if(training[i,"AHI"]>30){
+    #make AHI of 30 & above coded for 1
+    #one indicates abnormal AHI
+    training[i,"AHI"]<-1
+  }
+  else{
+    #make AHI of below 30 coded for 0
+    #zero indicates abnormal AHI
+    training[i,"AHI"]<-0
+  }
+}
+head(training)
+
+#make the AHI var into a binary outcome var
+for(i in 1:nrow(testing)){
+  if(testing[i,"AHI"]>30){
+    #make AHI of 30 & above coded for 1
+    #one indicates abnormal AHI
+    testing[i,"AHI"]<-1
+  }
+  else{
+    #make AHI of below 30 coded for 0
+    #zero indicates abnormal AHI
+    testing[i,"AHI"]<-0
+  }
+}
+head(testing)
+#assign y var 
+
+testing.y<-testing$AHI
+#head(testing.y)
+#length(y)
+
+#remove y var from predictors list
+testing.x<-testing[,-9]
+#head(testing.x)
+
+
+mod.logit <- glm(factor(AHI)~AHI.REM+Apnea.Counts+Latency.to.REM+Desats.LT.90+Desats.LT.70, data = training, family = "binomial")
+print(summary(mod.logit))
+
+
+pred.y <- predict(mod.logit,newdata = testing.x, type = "response")
+pred.y <- ifelse(pred.y > 30, 1, 0)
+table(pred.y,testing.y)
+1-mean(pred.y != testing.y) # Accuracy rate
+
+pred_df<-data.frame(data=pred.y)
+
+# b.
+summary(mod.logit)
+
+#c.
+#head(print(training))
+pred_y_train <- mod.logit$fitted.values
+pred_y_train <- ifelse(pred_y_train > 30, 1,0)
+table(pred_y_train,training$AHI)
+1-mean(pred_y_train != training$AHI) # Accuracy rate
+
+#pred_df<-data.frame(data=pred_y_train)
+
+```
+
